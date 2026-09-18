@@ -202,8 +202,13 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
 
 (function(){
   "use strict";
-  var TARGET_DAY = 8;
-  var MAX_PLAYERS = 6;
+  var DEFAULT_TARGET_DAY = 8;
+  var MAX_PLAYERS = 10;
+
+var END_MODES = {
+  DAY: 'day',
+  LAST_SURVIVOR: 'lastSurvivor'
+};
 
   var EVENTS = [
     { text:"ฝูงซอมบี้โผล่กลางถนนขวางทาง!", choices:[
@@ -286,19 +291,23 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
   function statBox(cls,label,val){ var d=el('div','stat '+cls); d.innerHTML='<span class="lbl">'+label+'</span><span class="val">'+val+'</span>'; return d; }
   function pickEvent(){ return Math.floor(Math.random()*EVENTS.length); }
 
-  var state = {
-    phase: 'home',
-    numPlayers: 3,
-    players: [],
-    day: 1,
-    turnIndex: 0,
-    lastEvent: null,
-    lastOutcome: null,
-    result: null,
-    prankMode: false,
-    online: freshOnline()
-  };
+var state = {
+  phase: 'home',
+  numPlayers: 3,
+  players: [],
+  day: 1,
+  turnIndex: 0,
+  lastEvent: null,
+  lastOutcome: null,
+  result: null,
+  prankMode: false,
 
+  // เพิ่ม
+  endMode: END_MODES.DAY,
+  targetDay: DEFAULT_TARGET_DAY,
+
+  online: freshOnline()
+};
   function freshOnline(){
     return {
       db:null, code:'', myId:'', myName:'',
@@ -351,64 +360,238 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
     app.appendChild(panel);
   }
 
-  function renderSetup(app){
-    var panel = el('div','pixel-panel');
-    panel.appendChild(el('h1','','เล่นในเครื่องเดียว'));
-    panel.appendChild(el('p','dim center','ผลัดกันเล่นเครื่องเดียว รอดจนถึงคืนที่ '+TARGET_DAY));
-    panel.appendChild(el('h2','','จำนวนผู้เล่น (2-6)'));
+ function renderSetup(app){
+  var panel = el('div','pixel-panel');
 
-    var countRow = el('div','statrow');
-    var minus = el('button','btn alt','−'); minus.style.flex='0 0 54px';
-    var display = el('div','stat'); display.innerHTML='<span class="val" id="pcount">'+state.numPlayers+'</span>';
-    var plus = el('button','btn alt','+'); plus.style.flex='0 0 54px';
-    minus.onclick=function(){ if(state.numPlayers>2){state.numPlayers--;syncNameInputs();} };
-    plus.onclick=function(){ if(state.numPlayers<MAX_PLAYERS){state.numPlayers++;syncNameInputs();} };
-    countRow.appendChild(minus); countRow.appendChild(display); countRow.appendChild(plus);
-    panel.appendChild(countRow);
+  panel.appendChild(el('h1','','เล่นในเครื่องเดียว'));
 
-    var namesWrap = el('div'); namesWrap.id='namesWrap';
-    panel.appendChild(namesWrap);
+  var ruleText = state.endMode === END_MODES.DAY
+    ? '🌅 รอดให้ถึงคืนที่ ' + state.targetDay
+    : '☠️ เล่นจนเหลือคนสุดท้าย';
 
-    var startBtn = el('button','btn','▶ เริ่มเกม');
-    startBtn.onclick = function(){
-      var inputs = namesWrap.querySelectorAll('input');
-      state.players = [];
-      for(var i=0;i<inputs.length;i++){
-        var name = inputs[i].value.trim() || ('ผู้เล่น '+(i+1));
-        state.players.push({ name:name, hp:5, food:3, ammo:2, alive:true });
-      }
-      state.day=1; state.turnIndex=0; state.phase='passDevice'; render();
-    };
-    panel.appendChild(startBtn);
+  panel.appendChild(
+    el('p','dim center','ผลัดกันเล่นเครื่องเดียว • ' + ruleText)
+  );
 
-    var back = el('button','btn ghost','◀ กลับ');
-    back.onclick = function(){ state.phase='home'; render(); };
-    panel.appendChild(back);
+  // =========================
+  // จำนวนผู้เล่น
+  // =========================
+  panel.appendChild(el('h2','','จำนวนผู้เล่น (2-' + MAX_PLAYERS + ')'));
 
-    app.appendChild(panel);
+  var countRow = el('div','statrow');
 
-    function syncNameInputs(){
-      document.getElementById('pcount').textContent = state.numPlayers;
-      var wrap = document.getElementById('namesWrap');
-      var existing = wrap.querySelectorAll('input');
-      var vals = []; for(var i=0;i<existing.length;i++) vals.push(existing[i].value);
-      wrap.innerHTML='';
-      for(var i=0;i<state.numPlayers;i++){
-        var inp=document.createElement('input'); inp.type='text';
-        inp.placeholder='ชื่อผู้เล่น '+(i+1); inp.value=vals[i]||''; inp.maxLength=14;
-        wrap.appendChild(inp);
-      }
+  var minus = el('button','btn alt','−');
+  minus.style.flex = '0 0 54px';
+
+  var display = el('div','stat');
+  display.innerHTML =
+    '<span class="val" id="pcount">' + state.numPlayers + '</span>';
+
+  var plus = el('button','btn alt','+');
+  plus.style.flex = '0 0 54px';
+
+  minus.onclick = function(){
+    if(state.numPlayers > 2){
+      state.numPlayers--;
+      syncNameInputs();
     }
-    syncNameInputs();
+  };
+
+  plus.onclick = function(){
+    if(state.numPlayers < MAX_PLAYERS){
+      state.numPlayers++;
+      syncNameInputs();
+    }
+  };
+
+  countRow.appendChild(minus);
+  countRow.appendChild(display);
+  countRow.appendChild(plus);
+
+  panel.appendChild(countRow);
+
+
+  // =========================
+  // กติกาการจบเกม
+  // =========================
+  panel.appendChild(el('h2','','กติกาการจบเกม'));
+
+  var modeRow = el('div','statrow');
+
+  var dayBtn = el(
+    'button',
+    state.endMode === END_MODES.DAY ? 'btn' : 'btn alt',
+    '🌅 รอดให้ถึงวันที่กำหนด'
+  );
+
+  var lastBtn = el(
+    'button',
+    state.endMode === END_MODES.LAST_SURVIVOR ? 'btn' : 'btn alt',
+    '☠️ เหลือคนสุดท้าย'
+  );
+
+  dayBtn.onclick = function(){
+    state.endMode = END_MODES.DAY;
+    render();
+  };
+
+  lastBtn.onclick = function(){
+    state.endMode = END_MODES.LAST_SURVIVOR;
+    render();
+  };
+
+  modeRow.appendChild(dayBtn);
+  modeRow.appendChild(lastBtn);
+
+  panel.appendChild(modeRow);
+
+
+  // =========================
+  // จำนวนคืน
+  // =========================
+  if(state.endMode === END_MODES.DAY){
+
+    panel.appendChild(el('h2','','จำนวนคืน'));
+
+    var targetRow = el('div','statrow');
+
+    [3,5,8,10,15].forEach(function(day){
+
+      var btn = el(
+        'button',
+        state.targetDay === day ? 'btn' : 'btn alt',
+        day + ' คืน' + (state.targetDay === day ? ' ✓' : '')
+      );
+
+      btn.onclick = function(){
+        state.targetDay = day;
+        render();
+      };
+
+      targetRow.appendChild(btn);
+    });
+
+    panel.appendChild(targetRow);
+
+  } else {
+
+    panel.appendChild(
+      el(
+        'p',
+        'dim center',
+        'เล่นต่อไปเรื่อย ๆ จนเหลือผู้รอดชีวิตเพียง 1 คน'
+      )
+    );
   }
 
-  function renderPassDevice(app){
+
+  // =========================
+  // ชื่อผู้เล่น
+  // =========================
+  var namesWrap = el('div');
+  namesWrap.id = 'namesWrap';
+
+  panel.appendChild(namesWrap);
+
+
+  // =========================
+  // เริ่มเกม
+  // =========================
+  var startBtn = el('button','btn','▶ เริ่มเกม');
+
+  startBtn.onclick = function(){
+
+    var inputs = namesWrap.querySelectorAll('input');
+
+    state.players = [];
+
+    for(var i = 0; i < inputs.length; i++){
+
+      var name = inputs[i].value.trim() ||
+        ('ผู้เล่น ' + (i + 1));
+
+      state.players.push({
+        name: name,
+        hp: 5,
+        food: 3,
+        ammo: 2,
+        alive: true
+      });
+    }
+
+    state.day = 1;
+    state.turnIndex = 0;
+    state.phase = 'passDevice';
+
+    render();
+  };
+
+  panel.appendChild(startBtn);
+
+
+  // =========================
+  // กลับ
+  // =========================
+  var back = el('button','btn ghost','◀ กลับ');
+
+  back.onclick = function(){
+    state.phase = 'home';
+    render();
+  };
+
+  panel.appendChild(back);
+
+  app.appendChild(panel);
+
+
+  // =========================
+  // Sync ชื่อผู้เล่น
+  // =========================
+  function syncNameInputs(){
+
+    document.getElementById('pcount').textContent =
+      state.numPlayers;
+
+    var wrap = document.getElementById('namesWrap');
+
+    var existing = wrap.querySelectorAll('input');
+
+    var vals = [];
+
+    for(var i = 0; i < existing.length; i++){
+      vals.push(existing[i].value);
+    }
+
+    wrap.innerHTML = '';
+
+    for(var i = 0; i < state.numPlayers; i++){
+
+      var inp = document.createElement('input');
+
+      inp.type = 'text';
+      inp.placeholder = 'ชื่อผู้เล่น ' + (i + 1);
+      inp.value = vals[i] || '';
+      inp.maxLength = 14;
+
+      wrap.appendChild(inp);
+    }
+  }
+
+  syncNameInputs();
+}
+ function renderPassDevice(app){
     var p = alivePlayers()[state.turnIndex % alivePlayers().length];
     var panel = el('div','pixel-panel center');
     panel.appendChild(el('div','big-emoji','📱'));
     panel.appendChild(el('h2','','ส่งเครื่องให้'));
     panel.appendChild(el('h1','',esc(p.name)));
-    panel.appendChild(el('p','dim','คืนที่ '+state.day+' / '+TARGET_DAY));
+    panel.appendChild(el('p','dim',
+      'คืนที่ ' + state.day + (
+        state.endMode === END_MODES.DAY
+          ? ' / ' + state.targetDay
+          : ' / ☠️ คนสุดท้าย'
+      )
+    ));
     var btn = el('button','btn','▶ ถึงตาฉันแล้ว');
     btn.onclick=function(){ state.phase='event'; state.lastEvent=EVENTS[pickEvent()]; state.prankMode=false; render(); };
     panel.appendChild(btn);
@@ -439,7 +622,7 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
       }
     }
     var daybar = el('div','daybar');
-    daybar.innerHTML='<span>คืนที่ <b>'+state.day+'</b> / '+TARGET_DAY+'</span><span>'+esc(p.name)+'</span>';
+    daybar.innerHTML='<span>คืนที่ <b>'+state.day+'</b> / '+state.targetDay+'</span><span>'+esc(p.name)+'</span>';
     app.appendChild(daybar);
 
     var others = living.filter(function(o){ return o!==p; });
@@ -528,23 +711,69 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
 
   function advanceLocalTurn(){
     state.players.forEach(function(p){ p._starvedThisTurn=false; });
+
     var living = alivePlayers();
-    if(living.length===0){ state.phase='end'; state.result='allDead'; return render(); }
+
+    if(living.length===0){
+      state.phase='end';
+      state.result='allDead';
+      return render();
+    }
+
+    // เหลือผู้รอดชีวิตเพียง 1 คน = จบทันที
+    if(
+      state.endMode === END_MODES.LAST_SURVIVOR &&
+      living.length === 1
+    ){
+      state.phase='end';
+      state.result='lastSurvivor';
+      return render();
+    }
+
     state.turnIndex++;
     var stillLiving = alivePlayers();
+
     if(state.turnIndex >= stillLiving.length){
-      state.turnIndex=0; state.day++;
-      if(state.day > TARGET_DAY){ state.phase='end'; state.result='win'; return render(); }
-      state.phase='night'; return render();
+      state.turnIndex=0;
+      state.day++;
+
+      // โหมดกำหนดจำนวนคืน
+      if(
+        state.endMode === END_MODES.DAY &&
+        state.day > state.targetDay
+      ){
+        state.phase='end';
+        state.result='win';
+        return render();
+      }
+
+      // ถ้าระหว่างจบรอบเหลือคนเดียว
+      if(
+        state.endMode === END_MODES.LAST_SURVIVOR &&
+        stillLiving.length === 1
+      ){
+        state.phase='end';
+        state.result='lastSurvivor';
+        return render();
+      }
+
+      state.phase='night';
+      return render();
     }
-    state.phase='passDevice'; render();
+
+    state.phase='passDevice';
+    return render();
   }
 
   function renderNight(app){
     var panel = el('div','pixel-panel center');
     panel.appendChild(el('div','big-emoji','🌙'));
     panel.appendChild(el('h2','','คืนที่ '+state.day+' ผ่านไปแล้ว'));
-    panel.appendChild(el('p','dim','ฝูงซอมบี้ดูจะแข็งแกร่งขึ้นทุกคืน... เหลืออีก '+Math.max(0,TARGET_DAY-state.day+1)+' คืนถึงรุ่งอรุณ'));
+    var nightText = state.endMode === END_MODES.DAY
+      ? 'ฝูงซอมบี้ดูจะแข็งแกร่งขึ้นทุกคืน... เหลืออีก '+Math.max(0,state.targetDay-state.day+1)+' คืนถึงรุ่งอรุณ'
+      : 'ฝูงซอมบี้ดูจะแข็งแกร่งขึ้นทุกคืน... เล่นต่อจนเหลือผู้รอดชีวิตเพียง 1 คน';
+
+    panel.appendChild(el('p','dim',nightText));
     var btn = el('button','btn','▶ เริ่มคืนถัดไป');
     btn.onclick=function(){ state.phase='passDevice'; render(); };
     panel.appendChild(btn);
@@ -554,18 +783,46 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
 
   function renderEnd(app){
     var panel = el('div','pixel-panel center');
-    if(state.result==='win'){
+
+    if(state.result==='lastSurvivor'){
+      var winner = alivePlayers()[0];
+
+      panel.appendChild(el('div','big-emoji','🏆'));
+      panel.appendChild(el('h1','','ผู้รอดชีวิต<br>คนสุดท้าย!'));
+
+      if(winner){
+        panel.appendChild(el('p','','☠️ ผู้รอดชีวิต:'));
+        panel.appendChild(el('h2','',esc(winner.name)));
+
+        var stats = el('div','statrow');
+        stats.appendChild(statBox('hp','HP',winner.hp));
+        stats.appendChild(statBox('food','เสบียง',winner.food));
+        stats.appendChild(statBox('ammo','กระสุน',winner.ammo));
+        panel.appendChild(stats);
+      }
+
+    } else if(state.result==='win'){
       panel.appendChild(el('div','big-emoji','🏆'));
       panel.appendChild(el('h1','','รอดจนถึง<br>รุ่งอรุณ!'));
       panel.appendChild(el('p','','ผู้รอดชีวิต:'));
-      alivePlayers().forEach(function(p){ panel.appendChild(el('p','',' • '+esc(p.name))); });
+      alivePlayers().forEach(function(p){
+        panel.appendChild(el('p','',' • '+esc(p.name)));
+      });
+
     } else {
       panel.appendChild(el('div','big-emoji','🧟‍♂️🧟‍♀️'));
       panel.appendChild(el('h1','','ซอมบี้<br>ครองเมือง'));
-      panel.appendChild(el('p','dim','ไม่มีใครรอดถึงคืนที่ '+TARGET_DAY));
+      panel.appendChild(el('p','dim','ไม่มีใครรอดชีวิต'));
     }
+
     var btn = el('button','btn blood','↺ เล่นใหม่');
-    btn.onclick=function(){ state.phase='home'; state.players=[]; render(); };
+    btn.onclick=function(){
+      state.phase='home';
+      state.players=[];
+      state.result=null;
+      render();
+    };
+
     panel.appendChild(btn);
     app.appendChild(panel);
   }
@@ -580,19 +837,97 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
   function renderOnlineCreateName(app){
     var panel = el('div','pixel-panel');
     panel.appendChild(el('h1','','สร้างห้อง<br>ออนไลน์'));
-    if(state.online.createError) panel.appendChild(el('p','err',esc(state.online.createError)));
-    var input = document.createElement('input'); input.type='text'; input.placeholder='ชื่อของคุณ'; input.maxLength=14;
+
+    if(state.online.createError){
+      panel.appendChild(el('p','err',esc(state.online.createError)));
+    }
+
+    var input = document.createElement('input');
+    input.type='text';
+    input.placeholder='ชื่อของคุณ';
+    input.maxLength=14;
     panel.appendChild(input);
+
+    panel.appendChild(el('h2','','กติกาการจบเกม'));
+
+    var modeRow = el('div','statrow');
+
+    var dayBtn = el(
+      'button',
+      state.endMode === END_MODES.DAY ? 'btn' : 'btn alt',
+      '🌅 รอดให้ถึงวันที่กำหนด'
+    );
+
+    var lastBtn = el(
+      'button',
+      state.endMode === END_MODES.LAST_SURVIVOR ? 'btn' : 'btn alt',
+      '☠️ เหลือคนสุดท้าย'
+    );
+
+    dayBtn.onclick = function(){
+      state.endMode = END_MODES.DAY;
+      render();
+    };
+
+    lastBtn.onclick = function(){
+      state.endMode = END_MODES.LAST_SURVIVOR;
+      render();
+    };
+
+    modeRow.appendChild(dayBtn);
+    modeRow.appendChild(lastBtn);
+    panel.appendChild(modeRow);
+
+    if(state.endMode === END_MODES.DAY){
+      panel.appendChild(el('h2','','จำนวนคืน'));
+
+      var targetRow = el('div','statrow');
+
+      [3,5,8,10,15].forEach(function(day){
+        var targetBtn = el(
+          'button',
+          state.targetDay === day ? 'btn' : 'btn alt',
+          day + ' คืน' + (state.targetDay === day ? ' ✓' : '')
+        );
+
+        targetBtn.onclick = function(){
+          state.targetDay = day;
+          render();
+        };
+
+        targetRow.appendChild(targetBtn);
+      });
+
+      panel.appendChild(targetRow);
+    } else {
+      panel.appendChild(
+        el('p','dim center','เล่นต่อไปจนเหลือผู้รอดชีวิตเพียง 1 คน')
+      );
+    }
+
     var btn = el('button','btn','▶ สร้างห้อง');
     btn.onclick = function(){
       var name = input.value.trim();
-      if(!name){ state.online.createError='ใส่ชื่อก่อนนะ'; render(); return; }
-      btn.textContent='กำลังสร้าง...'; btn.disabled=true;
+
+      if(!name){
+        state.online.createError='ใส่ชื่อก่อนนะ';
+        render();
+        return;
+      }
+
+      btn.textContent='กำลังสร้าง...';
+      btn.disabled=true;
       createRoom(name);
     };
+
     panel.appendChild(btn);
+
     var back = el('button','btn ghost','◀ กลับ');
-    back.onclick=function(){ state.phase='home'; render(); };
+    back.onclick=function(){
+      state.phase='home';
+      render();
+    };
+
     panel.appendChild(back);
     app.appendChild(panel);
   }
@@ -602,7 +937,12 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
       if(!db){ state.online.createError='เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่'; state.phase='onlineCreateName'; return render(); }
       var code = genCode();
       var roomRef = db.doc('rooms/'+code);
-      roomRef.set({ status:'lobby', targetDay:TARGET_DAY, createdAt:Date.now() }).then(function(){
+      roomRef.set({
+        status:'lobby',
+        endMode:state.endMode,
+        targetDay:state.targetDay,
+        createdAt:Date.now()
+      }).then(function(){
         var myId = genId();
         return roomRef.collection('players').doc(myId).set({ name:name, hp:5, food:3, ammo:2, alive:true, joinedAt:Date.now() }).then(function(){
           state.online.code = code; state.online.myId = myId; state.online.myName = name; state.online.roomRef = roomRef;
@@ -724,6 +1064,12 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
     panel.appendChild(copyBtn);
     panel.appendChild(el('p','dim','เพื่อนกดลิงก์นี้แล้วจะข้ามไปหน้าใส่ชื่อพร้อมรหัสห้องให้เลย (ต้องแชร์อาร์ติแฟกต์นี้ให้เขาเปิดได้ก่อนด้วยปุ่ม Share)'));
 
+    var lobbyMeta = state.online.meta || {};
+    var lobbyRule = lobbyMeta.endMode === END_MODES.LAST_SURVIVOR
+      ? '☠️ เหลือคนสุดท้าย'
+      : '🌅 รอดถึงคืนที่ ' + (lobbyMeta.targetDay || DEFAULT_TARGET_DAY);
+
+    panel.appendChild(el('p','dim','กติกา: '+lobbyRule));
     panel.appendChild(el('p','dim','ผู้เล่นในห้อง ('+state.online.playersList.length+')'));
 
     var wrap = el('div','roster');
@@ -781,15 +1127,30 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
 
     if(meta.status==='ended'){
       var panel = el('div','pixel-panel center');
-      if(meta.result==='win'){
+      if(meta.result==='lastSurvivor'){
+        var winner = players.filter(function(p){ return p.id===meta.winnerId; })[0]
+          || players.filter(function(p){ return p.alive; })[0];
+
+        panel.appendChild(el('div','big-emoji','🏆'));
+        panel.appendChild(el('h1','','ผู้รอดชีวิต<br>คนสุดท้าย!'));
+
+        if(winner){
+          panel.appendChild(el('p','','☠️ ผู้รอดชีวิต:'));
+          panel.appendChild(el('h2','',esc(winner.name)));
+        }
+
+      } else if(meta.result==='win'){
         panel.appendChild(el('div','big-emoji','🏆'));
         panel.appendChild(el('h1','','รอดจนถึง<br>รุ่งอรุณ!'));
         panel.appendChild(el('p','','ผู้รอดชีวิต:'));
-        players.filter(function(p){return p.alive;}).forEach(function(p){ panel.appendChild(el('p','',' • '+esc(p.name))); });
+        players.filter(function(p){return p.alive;}).forEach(function(p){
+          panel.appendChild(el('p','',' • '+esc(p.name)));
+        });
+
       } else {
         panel.appendChild(el('div','big-emoji','🧟‍♂️🧟‍♀️'));
         panel.appendChild(el('h1','','ซอมบี้<br>ครองเมือง'));
-        panel.appendChild(el('p','dim','ไม่มีใครรอดถึงคืนที่ '+TARGET_DAY));
+        panel.appendChild(el('p','dim','ไม่มีใครรอดชีวิต'));
       }
       var leave = el('button','btn ghost','◀ ออกจากห้อง');
       leave.onclick = leaveOnline;
@@ -803,7 +1164,13 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
     var activeName = (players.filter(function(p){return p.id===meta.activePlayerId;})[0] || {}).name || '...';
 
     var daybar = el('div','daybar');
-    daybar.innerHTML = '<span>คืนที่ <b>'+meta.day+'</b> / '+TARGET_DAY+'</span><span>รหัส '+esc(state.online.code)+'</span>';
+    var onlineDayLimit = meta.endMode === END_MODES.LAST_SURVIVOR
+      ? '☠️ คนสุดท้าย'
+      : (meta.targetDay || DEFAULT_TARGET_DAY);
+
+    daybar.innerHTML =
+      '<span>คืนที่ <b>'+meta.day+'</b> / '+onlineDayLimit+'</span>' +
+      '<span>รหัส '+esc(state.online.code)+'</span>';
     app.appendChild(daybar);
 
     if(meta.turnPhase==='awaitingChoice'){
@@ -922,23 +1289,71 @@ var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(f
       .sort(function(a,b){ return (a.joinedAt||0)-(b.joinedAt||0); });
 
     if(alive.length===0){
-      state.online.roomRef.update({ status:'ended', result:'allDead' }).catch(function(){});
+      state.online.roomRef.update({
+        status:'ended',
+        result:'allDead'
+      }).catch(function(){});
       return;
     }
+
+    // ☠️ โหมดเหลือคนสุดท้าย
+    if(
+      meta.endMode === END_MODES.LAST_SURVIVOR &&
+      alive.length === 1
+    ){
+      state.online.roomRef.update({
+        status:'ended',
+        result:'lastSurvivor',
+        winnerId:alive[0].id,
+        day:meta.day
+      }).catch(function(){});
+      return;
+    }
+
     var idx = -1;
-    for(var i=0;i<alive.length;i++){ if(alive[i].id===meta.activePlayerId) idx=i; }
+    for(var i=0;i<alive.length;i++){
+      if(alive[i].id===meta.activePlayerId) idx=i;
+    }
+
     var nextIdx = idx+1;
     var day = meta.day;
-    if(nextIdx >= alive.length){ nextIdx=0; day+=1; }
 
-    if(day > TARGET_DAY){
-      state.online.roomRef.update({ status:'ended', result:'win', day:day }).catch(function(){});
+    if(nextIdx >= alive.length){
+      nextIdx=0;
+      day+=1;
+    }
+
+    // 🌅 โหมดกำหนดจำนวนคืน
+    if(
+      meta.endMode !== END_MODES.LAST_SURVIVOR &&
+      day > (meta.targetDay || DEFAULT_TARGET_DAY)
+    ){
+      state.online.roomRef.update({
+        status:'ended',
+        result:'win',
+        day:day,
+        targetDay:(meta.targetDay || DEFAULT_TARGET_DAY)
+      }).catch(function(){});
       return;
     }
+
     var nextPlayer = alive[nextIdx];
+
+    if(!nextPlayer){
+      state.online.roomRef.update({
+        status:'ended',
+        result:'allDead'
+      }).catch(function(){});
+      return;
+    }
+
     state.online.roomRef.update({
-      turnPhase:'awaitingChoice', activePlayerId: nextPlayer.id, day: day,
-      eventIdx: pickEvent(), lastOutcome:'', lastChoiceLabel:''
+      turnPhase:'awaitingChoice',
+      activePlayerId:nextPlayer.id,
+      day:day,
+      eventIdx:pickEvent(),
+      lastOutcome:'',
+      lastChoiceLabel:''
     }).catch(function(){});
   }
 
