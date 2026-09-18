@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>เอาตัวรอดจากซอมบี้</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0a0e08; --bezel:#232823; --bezel-edge:#37402f; --screen:#0f1a10;
+    --panel:#152218; --border:#3f5a3d; --toxic:#7ee081; --toxic-dim:#4c9a52;
+    --blood:#d1483f; --rust:#c98a3f; --bone:#e9e6d4; --dim:#7c8a76; --led:#e04b3f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --void:#0a0e08; --bezel:#232823; --bezel-edge:#37402f; --screen:#0f1a10;
+      --panel:#152218; --border:#3f5a3d; --toxic:#7ee081; --toxic-dim:#4c9a52;
+      --blood:#d1483f; --rust:#c98a3f; --bone:#e9e6d4; --dim:#7c8a76; --led:#e04b3f;
+    }
+  }
+  :root[data-theme="dark"]{
+    --void:#0a0e08; --bezel:#232823; --bezel-edge:#37402f; --screen:#0f1a10;
+    --panel:#152218; --border:#3f5a3d; --toxic:#7ee081; --toxic-dim:#4c9a52;
+    --blood:#d1483f; --rust:#c98a3f; --bone:#e9e6d4; --dim:#7c8a76; --led:#e04b3f;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--void); min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:18px; font-family:'VT323',monospace; color:var(--bone);
+  }
+
+  .console{
+    width:100%; max-width:420px;
+    background:linear-gradient(180deg,var(--bezel),var(--bezel-edge));
+    border-radius:22px; padding:16px 14px 22px;
+    box-shadow:0 0 0 2px #000, 0 18px 40px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.05);
+  }
+  .console-top{ display:flex; align-items:center; justify-content:space-between; padding:2px 6px 12px; }
+  .led{ width:9px;height:9px;border-radius:50%; background:var(--led); box-shadow:0 0 6px 2px rgba(224,75,63,.7); animation:blink 2.6s steps(1) infinite; }
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .brand{ font-family:'Press Start 2P',monospace; font-size:8px; letter-spacing:1px; color:var(--dim); }
+
+  .screen{
+    position:relative; background:var(--screen); border-radius:6px; padding:16px 14px; overflow:hidden;
+    box-shadow:inset 0 0 0 3px #000, inset 0 0 40px rgba(0,0,0,.6);
+    min-height:540px; display:flex; flex-direction:column;
+  }
+  .screen::before{ content:""; position:absolute;inset:0; background:repeating-linear-gradient(rgba(0,0,0,.18) 0 1px, transparent 1px 3px); pointer-events:none; z-index:5; }
+  .screen::after{ content:""; position:absolute;inset:0; background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45) 100%); pointer-events:none; z-index:5; }
+
+  .pixel-panel{
+    background:var(--panel); border:3px solid var(--border);
+    clip-path:polygon(0 8px,8px 8px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 8px) calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 8px),0 calc(100% - 8px));
+    padding:14px;
+  }
+
+  h1,h2,.px{font-family:'Press Start 2P',monospace;}
+  h1{ font-size:15px; line-height:1.7; color:var(--toxic); text-shadow:0 0 8px rgba(126,224,129,.35); margin:6px 0 12px; text-align:center; }
+  h2{ font-size:10px; color:var(--rust); margin:0 0 10px; line-height:1.6; }
+  p{font-size:21px;line-height:1.45;margin:0 0 10px;color:var(--bone);}
+  .dim{color:var(--dim);font-size:17px;}
+
+  .btn{
+    display:block; width:100%; font-family:'Press Start 2P',monospace; font-size:10px; line-height:1.6;
+    color:var(--screen); background:var(--toxic); border:none; padding:12px 10px; margin-top:10px; cursor:pointer; text-align:center;
+    clip-path:polygon(0 6px,6px 6px,6px 0,calc(100% - 6px) 0,calc(100% - 6px) 6px,100% 6px,100% calc(100% - 6px),calc(100% - 6px) calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,6px calc(100% - 6px),0 calc(100% - 6px));
+    box-shadow:0 4px 0 var(--toxic-dim); transition:transform .05s;
+  }
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--toxic-dim);}
+  .btn.alt{background:var(--panel);color:var(--bone);border:2px solid var(--border);box-shadow:0 4px 0 #000;}
+  .btn.alt:active{box-shadow:0 1px 0 #000;}
+  .btn.blood{background:var(--blood);box-shadow:0 4px 0 #7a2b25;}
+  .btn.blood:active{box-shadow:0 1px 0 #7a2b25;}
+  .btn.ghost{background:transparent;color:var(--dim);border:2px dashed var(--border);box-shadow:none;}
+  .btn:focus-visible{outline:3px solid var(--bone);outline-offset:2px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  input[type=text]{
+    width:100%; font-family:'VT323',monospace; font-size:20px; background:var(--screen);
+    border:2px solid var(--border); color:var(--bone); padding:8px 10px; margin-bottom:8px;
+  }
+  input[type=text]:focus{outline:2px solid var(--toxic);}
+  input.code-input{ font-family:'Press Start 2P',monospace; font-size:18px; letter-spacing:4px; text-align:center; text-transform:uppercase; }
+
+  .content{flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;}
+
+  .statrow{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+  .stat{flex:1;min-width:70px;background:var(--screen);border:2px solid var(--border);padding:6px 4px;text-align:center;}
+  .stat .lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);display:block;margin-bottom:4px;letter-spacing:.5px;}
+  .stat .val{font-size:22px;color:var(--bone);}
+  .stat.hp .val{color:var(--blood);}
+  .stat.food .val{color:var(--rust);}
+  .stat.ammo .val{color:var(--toxic);}
+
+  .roster{margin-bottom:10px;}
+  .roster-item{ display:flex;align-items:center;justify-content:space-between; padding:6px 8px;margin-bottom:4px;
+    background:var(--screen);border-left:3px solid var(--border); font-size:18px; }
+  .roster-item.dead{border-left-color:var(--dim);color:var(--dim);text-decoration:line-through;}
+  .roster-item.active{border-left-color:var(--toxic);}
+  .hearts{font-size:14px;letter-spacing:1px;}
+
+  .daybar{ display:flex;align-items:center;justify-content:space-between; margin-bottom:10px;font-size:17px;color:var(--dim); }
+  .daybar b{color:var(--toxic);font-size:19px;}
+
+  .center{text-align:center;}
+  .big-emoji{font-size:46px;text-align:center;margin:6px 0 10px;}
+  .code-display{
+    font-family:'Press Start 2P',monospace; font-size:30px; letter-spacing:6px; text-align:center;
+    color:var(--toxic); background:var(--screen); border:2px solid var(--border); padding:14px 6px; margin:10px 0;
+  }
+  .err{color:var(--blood);font-size:17px;margin-bottom:6px;}
+  .waitline{color:var(--dim);font-size:19px;text-align:center;margin:10px 0;}
+
+  footer{ text-align:center;margin-top:12px;font-family:'Press Start 2P',monospace; font-size:7px;color:var(--dim);letter-spacing:1px;position:relative;z-index:2; }
+
+  @media (max-width:360px){ h1{font-size:13px;} .stat .val{font-size:18px;} }
+
+  @keyframes popIn{ from{opacity:0; transform:scale(.85);} to{opacity:1; transform:scale(1);} }
+  @keyframes bounceIn{ 0%{transform:scale(.3);opacity:0;} 60%{transform:scale(1.2);opacity:1;} 100%{transform:scale(1);} }
+  @keyframes shakeX{ 10%,90%{transform:translateX(-2px);} 20%,80%{transform:translateX(4px);} 30%,50%,70%{transform:translateX(-7px);} 40%,60%{transform:translateX(7px);} }
+  @keyframes flashRed{ 0%,100%{border-color:var(--border);} 30%{border-color:var(--blood);} }
+  @keyframes glowGreen{ 0%{box-shadow:0 0 0 0 rgba(126,224,129,0);} 40%{box-shadow:0 0 20px 5px rgba(126,224,129,.55);} 100%{box-shadow:0 0 0 0 rgba(126,224,129,0);} }
+
+  .result-anim{ animation:popIn .3s ease-out; }
+  .result-anim .big-emoji{ animation:bounceIn .45s ease-out; display:inline-block; }
+  .result-bad{ animation:popIn .3s ease-out, flashRed .5s ease-out; }
+  .result-bad .big-emoji{ animation:bounceIn .45s ease-out, shakeX .5s ease-out .1s; }
+  .result-good{ animation:popIn .3s ease-out, glowGreen .8s ease-out; }
+
+  @media (prefers-reduced-motion: reduce){
+    .result-anim, .result-anim .big-emoji, .result-bad, .result-bad .big-emoji, .result-good{ animation:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="console">
+  <div class="console-top">
+    <span class="led" aria-hidden="true"></span>
+    <span class="brand">SURVIVE-8BIT</span>
+    <span class="brand">🧟</span>
+  </div>
+  <div class="screen"><div class="content" id="app"></div></div>
+  <footer>PASS &amp; PLAY หรือ ออนไลน์</footer>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+var firebaseConfig = {
+  apiKey: "AIzaSyBWr1YBRSFrplbfJDhX6kOCbBCVyppidQs",
+  authDomain: "zomb-717ec.firebaseapp.com",
+  projectId: "zomb-717ec",
+  storageBucket: "zomb-717ec.firebasestorage.app",
+  messagingSenderId: "926801944294",
+  appId: "1:926801944294:web:f91b855c768b197b9e6527"
+};
+
+var firestoreDb = null;
+try{
+  var fbApp = initializeApp(firebaseConfig);
+  firestoreDb = getFirestore(fbApp);
+}catch(e){ firestoreDb = null; }
+
+function wrapDoc(docRef){
+  return {
+    id: docRef.id,
+    path: docRef.path,
+    get: function(){
+      return getDoc(docRef).then(function(snap){
+        return { exists: snap.exists(), data: function(){ return snap.data(); } };
+      });
+    },
+    set: function(data){ return setDoc(docRef, data); },
+    update: function(data){ return updateDoc(docRef, data); },
+    onSnapshot: function(next, errCb){
+      return onSnapshot(docRef, function(snap){
+        next({ exists: snap.exists(), data: function(){ return snap.data(); } });
+      }, errCb);
+    },
+    collection: function(sub){ return wrapCollection(collection(docRef, sub)); }
+  };
+}
+function wrapCollection(colRef){
+  return {
+    doc: function(id){ return wrapDoc(id ? doc(colRef, id) : doc(colRef)); },
+    onSnapshot: function(next, errCb){
+      return onSnapshot(colRef, function(qs){
+        var docs = [];
+        qs.forEach(function(d){ docs.push({ id:d.id, data:function(){ return d.data(); } }); });
+        next({ docs:docs });
+      }, errCb);
+    }
+  };
+}
+var firestoreWrapped = firestoreDb ? { doc: function(path){ return wrapDoc(doc(firestoreDb, path)); } } : null;
+
+(function(){
+  "use strict";
+  var TARGET_DAY = 8;
+  var MAX_PLAYERS = 6;
+
+  var EVENTS = [
+    { text:"ฝูงซอมบี้โผล่กลางถนนขวางทาง!", choices:[
+        { label:"▶ ยิงเปิดทาง (ใช้กระสุน)", run:function(p){ if(p.ammo>0){p.ammo-=1;return "เปิดทางได้สำเร็จ เสียกระสุนไป 1 นัด";} return doDamage(p,2,"ไม่มีกระสุน! โดนข่วนเข้าเต็มๆ");}},
+        { label:"▶ วิ่งหนีสุดชีวิต", run:function(p){ p.food=Math.max(0,p.food-1); return "หนีรอดมาได้ แต่เสียเสบียงไป 1 ระหว่างทาง";}},
+        { label:"▶ หลบเข้าซอกตึก", run:function(p){ if(Math.random()<0.5) return "ซ่อนตัวเงียบๆ จนฝูงซอมบี้เดินผ่านไป"; return doDamage(p,1,"ถูกซอมบี้ตัวหนึ่งพบเข้า!");}}
+    ]},
+    { text:"เจอร้านสะดวกซื้อที่ถูกทิ้งร้าง มีของเหลืออยู่บ้าง", choices:[
+        { label:"▶ ค้นหาอาหาร", run:function(p){ p.food+=2; return "เจออาหารกระป๋องซุกอยู่หลังชั้น +2 เสบียง";}},
+        { label:"▶ ค้นหากระสุน", run:function(p){ p.ammo+=1; return "เจอกระสุนตกอยู่ใต้เคาน์เตอร์ +1 กระสุน";}},
+        { label:"▶ รีบออกไปก่อนเสียงจะดึงซอมบี้มา", run:function(p){ return "เลือกความปลอดภัยไว้ก่อน ไม่ได้อะไรแต่ก็ไม่เสียอะไร";}}
+    ]},
+    { text:"ได้ยินเสียงร้องขอความช่วยเหลือมาจากตรอกข้างๆ", choices:[
+        { label:"▶ เข้าไปช่วย", run:function(p){ if(Math.random()<0.6){p.hp=Math.min(5,p.hp+2);return "เป็นผู้รอดชีวิตจริง! เขาแบ่งเสบียงปฐมพยาบาลให้ +2 HP";} return doDamage(p,2,"เป็นกับดัก! ซอมบี้กลุ่มหนึ่งซุ่มอยู่");}},
+        { label:"▶ เดินผ่านไป ไม่เสี่ยง", run:function(p){ return "ใจแข็งเดินจากไป... ปลอดภัยไว้ก่อน";}}
+    ]},
+    { text:"พายุฝนกระหน่ำ ท้องฟ้ามืดครึ้ม ต้องหาที่กำบังคืนนี้", choices:[
+        { label:"▶ นอนในรถที่ถูกทิ้งไว้", run:function(p){ p.food=Math.max(0,p.food-1); return "หลับได้ไม่สนิทนัก เสียเสบียงไป 1 ระหว่างรอฝนซา";}},
+        { label:"▶ บุกเข้าไปในบ้านร้าง", run:function(p){ if(Math.random()<0.5){p.food+=2;return "เจอห้องเก็บของที่ยังไม่โดนปล้น +2 เสบียง";} return doDamage(p,2,"มีซอมบี้หลบฝนอยู่ในบ้านเหมือนกัน!");}}
+    ]},
+    { text:"กระสุนเหลือน้อย ได้ยินเสียงฝูงซอมบี้เดินใกล้เข้ามาเรื่อยๆ", choices:[
+        { label:"▶ เก็บกระสุนไว้ก่อน อดทนรอ", run:function(p){ if(Math.random()<0.5) return "รอดมาได้ พวกมันเดินผ่านไปทางอื่น"; return doDamage(p,1,"พวกมันได้กลิ่นเข้า! หนีไม่ทันโดนข่วน");}},
+        { label:"▶ ยิงเตือนไล่ (ใช้กระสุน)", run:function(p){ if(p.ammo>0){p.ammo-=1;return "เสียงปืนไล่ฝูงซอมบี้ให้กระจายไป ปลอดภัย";} return doDamage(p,1,"ไม่มีกระสุนเหลือให้ยิง! ต้องสู้มือเปล่า");}}
+    ]},
+    { text:"เจอรถกระบะจอดทิ้งไว้ ถังน้ำมันยังมีของอยู่ด้านหลัง", choices:[
+        { label:"▶ เปิดท้ายรถดูของ", run:function(p){ var r=Math.random(); if(r<0.4){p.ammo+=2;return "เจอกล่องกระสุนเต็มลัง +2 กระสุน";} if(r<0.8){p.food+=1;return "เจอเสบียงเล็กน้อย +1 เสบียง";} return doDamage(p,1,"มีซอมบี้ซ่อนอยู่ใต้ผ้าใบคลุมรถ!");}},
+        { label:"▶ ไม่แตะต้องอะไร เดินหน้าต่อ", run:function(p){ return "ไม่เสี่ยงดีกว่า เดินทางต่อไปเงียบๆ";}}
+    ]},
+    { text:"เจอกล่องปฐมพยาบาลทหารตกอยู่ข้างซากรถถัง", choices:[
+        { label:"▶ เปิดดูข้างใน", run:function(p){ p.hp=Math.min(5,p.hp+2); return "มีผ้าพันแผลและยาแก้ปวดเพียบ +2 HP"; }},
+        { label:"▶ ข้ามไปเลย เผื่อมีกับระเบิด", run:function(p){ return "ระวังตัวไว้ก่อนดีกว่า เดินผ่านไปเงียบๆ"; }}
+    ]},
+    { text:"สะพานข้ามคลองพังไปครึ่งหนึ่ง เหลือแค่คานแคบๆ ให้เดินข้าม", choices:[
+        { label:"▶ เสี่ยงเดินข้ามคานที่เหลือ", run:function(p){ if(Math.random()<0.6) return "ทรงตัวได้ดี ข้ามฝั่งมาแบบใจหายใจคว่ำ"; return doDamage(p,2,"พลาดท่าตกลงไปในคลอง เจ็บไปทั้งตัว!"); }},
+        { label:"▶ หาทางอ้อมยาวๆ", run:function(p){ p.food=Math.max(0,p.food-1); return "อ้อมไปทางอื่น ปลอดภัยแต่เหนื่อยจนหิวเพิ่ม"; }}
+    ]},
+    { text:"เจอซอมบี้ตัวหนึ่งเต้นเบรกแดนซ์วนอยู่กลางสี่แยก เหมือนติดเพลงในหัวไม่เลิก", choices:[
+        { label:"▶ แอบดูเฉยๆ ให้มันเต้นไป", run:function(p){ if(Math.random()<0.5) return "มันเต้นเพลินจนไม่สนใจคุณเลย เดินผ่านไปสบายๆ"; return doDamage(p,1,"มันหมุนตัวสุดท่าแล้วล้มทับใส่พอดี!"); }},
+        { label:"▶ แอบถ่ายคลิปไว้เป็นที่ระลึกแล้วรีบเผ่น", run:function(p){ p.food=Math.max(0,p.food-1); return "ยืนถ่ายนานไปหน่อย สะดุดกระเป๋าเสบียงหล่นระหว่างวิ่ง"; }}
+    ]},
+    { text:"แรคคูนตัวเขื่องบุกเข้ามาคุ้ยถุงเสบียงตอนคุณเผลอหลับ", choices:[
+        { label:"▶ ไล่มันด้วยมือเปล่า", run:function(p){ if(Math.random()<0.5) return "ไล่มันหนีไปได้ทัน เสบียงปลอดภัย"; p.food=Math.max(0,p.food-2); return "มันคาบห่ออาหารวิ่งหนีไปต่อหน้าต่อตา -2 เสบียง"; }},
+        { label:"▶ ยอมสงบศึก แบ่งของกินให้มันครึ่งหนึ่ง", run:function(p){ p.food=Math.max(0,p.food-1); return "แบ่งของกินให้แรคคูนไปครึ่งหนึ่ง มันเดินจากไปอย่างพอใจ"; }}
+    ]},
+    { text:"เจอตู้ปาท่องโก๋เสียบปลั๊กอยู่กลางร้านร้าง ไฟยังติดอยู่เลยแปลกๆ", choices:[
+        { label:"▶ ลองทอดกินสักหน่อย", run:function(p){ p.food+=2; return "ได้ปาท่องโก๋ร้อนๆ ท่ามกลางวันสิ้นโลก อร่อยเกินคาด +2 เสบียง"; }},
+        { label:"▶ ไม่เสี่ยง เดี๋ยวไฟดูด", run:function(p){ return "ตัดสินใจไม่ยุ่งกับของแปลกๆ เดินผ่านไป"; }}
+    ]},
+    { text:"ป้ายโฆษณา 'เสื้อกันซอมบี้ 100%' ติดข้างถนน มีกล่องเสื้อผ้าวางล่อตาอยู่ข้างล่าง", choices:[
+        { label:"▶ หยิบมาใส่เลย เผื่อของจริง", run:function(p){ if(Math.random()<0.5){p.hp=Math.min(5,p.hp+1); return "ของจริง! ใส่แล้วรู้สึกอุ่นใจขึ้นเยอะ +1 HP";} p.food=Math.max(0,p.food-1); return "ของปลอมจากคนหลอกขาย เสียเวลาลองใส่ไปฟรีๆ"; }},
+        { label:"▶ ไม่เชื่อโฆษณา เดินต่อ", run:function(p){ return "มีสติไว้ก่อน สินค้าแบบนี้เชื่อไม่ได้หรอก"; }}
+    ]},
+    { text:"เจอนกแก้วเลี้ยงตัวหนึ่งที่รอดมาได้ มันร้องเลียนเสียงซอมบี้ครวญครางแม่นมาก", choices:[
+        { label:"▶ รับเลี้ยงไว้เป็นเพื่อน", run:function(p){ p.food=Math.max(0,p.food-1); p.hp=Math.min(5,p.hp+1); return "แบ่งอาหารเลี้ยงมันหน่อย แต่มีเพื่อนคุยด้วยทำให้ใจชื้นขึ้น +1 HP"; }},
+        { label:"▶ ปล่อยมันไป เดี๋ยวเสียงร้องดึงซอมบี้จริงมา", run:function(p){ return "ตัดใจปล่อยมันไป ปลอดภัยไว้ก่อน"; }}
+    ]}
+  ];
+
+  function doDamage(p,amount,msg){ p.hp=Math.max(0,p.hp-amount); return msg+" -"+amount+" HP"; }
+  function doPrank(actor,target){
+    if(Math.random() < 0.5){
+      var canFood = target.food>0, canAmmo = target.ammo>0;
+      if(!canFood && !canAmmo) return "ย่องไปหา "+target.name+" แต่เขาไม่มีอะไรให้ปล้นเลย เสียเวลาเปล่า";
+      if(canFood && (!canAmmo || Math.random()<0.5)){ target.food-=1; actor.food+=1; return "แอบปล้นเสบียงจาก "+target.name+" มาได้ 1 หน่วย! 😏"; }
+      target.ammo-=1; actor.ammo+=1; return "แอบปล้นกระสุนจาก "+target.name+" มาได้ 1 นัด! 😏";
+    }
+    actor.hp = Math.max(0,actor.hp-1);
+    return "โดน "+target.name+" จับได้คาหนังคาเขา! อายจนโดนต่อยเข้าไป -1 HP 🤕";
+  }
+  function deltaType(before,after){
+    if(after.hp < before.hp) return 'bad';
+    if(after.hp > before.hp) return 'good';
+    if(after.food>before.food || after.ammo>before.ammo) return 'good';
+    if(after.food<before.food || after.ammo<before.ammo) return 'bad';
+    return 'neutral';
+  }
+  function heartsFor(hp){ var s=""; for(var i=0;i<5;i++) s += i<hp ? "❤":"🖤"; return s; }
+  function esc(s){ var d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
+  function el(tag,cls,html){ var e=document.createElement(tag); if(cls)e.className=cls; if(html!==undefined)e.innerHTML=html; return e; }
+  function statBox(cls,label,val){ var d=el('div','stat '+cls); d.innerHTML='<span class="lbl">'+label+'</span><span class="val">'+val+'</span>'; return d; }
+  function pickEvent(){ return Math.floor(Math.random()*EVENTS.length); }
+
+  var state = {
+    phase: 'home',
+    numPlayers: 3,
+    players: [],
+    day: 1,
+    turnIndex: 0,
+    lastEvent: null,
+    lastOutcome: null,
+    result: null,
+    prankMode: false,
+    online: freshOnline()
+  };
+
+  function freshOnline(){
+    return {
+      db:null, code:'', myId:'', myName:'',
+      roomRef:null, playersUnsub:null, metaUnsub:null,
+      playersList:[], meta:null,
+      joinError:'', createError:'',
+      _turnKey:'', _starveChecked:false, busy:false, prankMode:false
+    };
+  }
+
+  function alivePlayers(){ return state.players.filter(function(p){ return p.alive; }); }
+
+  function render(){
+    var app = document.getElementById('app');
+    app.innerHTML = "";
+    var map = {
+      home: renderHome,
+      setup: renderSetup,
+      passDevice: renderPassDevice,
+      event: renderEvent,
+      result: renderResult,
+      night: renderNight,
+      end: renderEnd,
+      onlineCreateName: renderOnlineCreateName,
+      onlineJoin: renderOnlineJoin,
+      onlineLobby: renderOnlineLobby,
+      onlineGame: renderOnlineGame
+    };
+    (map[state.phase] || renderHome)(app);
+  }
+
+  function renderHome(app){
+    var panel = el('div','pixel-panel');
+    panel.appendChild(el('h1','','เอาตัวรอด<br>จากซอมบี้'));
+    panel.appendChild(el('p','dim center','เลือกโหมดที่จะเล่น'));
+
+    var b1 = el('button','btn','▶ เล่นในเครื่องเดียว (ส่งต่อ)');
+    b1.onclick = function(){ state.phase='setup'; render(); };
+    panel.appendChild(b1);
+
+    var b2 = el('button','btn alt','▶ สร้างห้องออนไลน์');
+    b2.onclick = function(){ state.online=freshOnline(); state.phase='onlineCreateName'; render(); };
+    panel.appendChild(b2);
+
+    var b3 = el('button','btn alt','▶ เข้าร่วมห้องออนไลน์');
+    b3.onclick = function(){ state.online=freshOnline(); state.phase='onlineJoin'; render(); };
+    panel.appendChild(b3);
+
+    panel.appendChild(el('p','dim','โหมดออนไลน์: ส่งลิงก์นี้ให้เพื่อนเปิดจากที่ไหนก็ได้ ไม่ต้องมีบัญชี Claude'));
+    app.appendChild(panel);
+  }
+
+  function renderSetup(app){
+    var panel = el('div','pixel-panel');
+    panel.appendChild(el('h1','','เล่นในเครื่องเดียว'));
+    panel.appendChild(el('p','dim center','ผลัดกันเล่นเครื่องเดียว รอดจนถึงคืนที่ '+TARGET_DAY));
+    panel.appendChild(el('h2','','จำนวนผู้เล่น (2-6)'));
+
+    var countRow = el('div','statrow');
+    var minus = el('button','btn alt','−'); minus.style.flex='0 0 54px';
+    var display = el('div','stat'); display.innerHTML='<span class="val" id="pcount">'+state.numPlayers+'</span>';
+    var plus = el('button','btn alt','+'); plus.style.flex='0 0 54px';
+    minus.onclick=function(){ if(state.numPlayers>2){state.numPlayers--;syncNameInputs();} };
+    plus.onclick=function(){ if(state.numPlayers<MAX_PLAYERS){state.numPlayers++;syncNameInputs();} };
+    countRow.appendChild(minus); countRow.appendChild(display); countRow.appendChild(plus);
+    panel.appendChild(countRow);
+
+    var namesWrap = el('div'); namesWrap.id='namesWrap';
+    panel.appendChild(namesWrap);
+
+    var startBtn = el('button','btn','▶ เริ่มเกม');
+    startBtn.onclick = function(){
+      var inputs = namesWrap.querySelectorAll('input');
+      state.players = [];
+      for(var i=0;i<inputs.length;i++){
+        var name = inputs[i].value.trim() || ('ผู้เล่น '+(i+1));
+        state.players.push({ name:name, hp:5, food:3, ammo:2, alive:true });
+      }
+      state.day=1; state.turnIndex=0; state.phase='passDevice'; render();
+    };
+    panel.appendChild(startBtn);
+
+    var back = el('button','btn ghost','◀ กลับ');
+    back.onclick = function(){ state.phase='home'; render(); };
+    panel.appendChild(back);
+
+    app.appendChild(panel);
+
+    function syncNameInputs(){
+      document.getElementById('pcount').textContent = state.numPlayers;
+      var wrap = document.getElementById('namesWrap');
+      var existing = wrap.querySelectorAll('input');
+      var vals = []; for(var i=0;i<existing.length;i++) vals.push(existing[i].value);
+      wrap.innerHTML='';
+      for(var i=0;i<state.numPlayers;i++){
+        var inp=document.createElement('input'); inp.type='text';
+        inp.placeholder='ชื่อผู้เล่น '+(i+1); inp.value=vals[i]||''; inp.maxLength=14;
+        wrap.appendChild(inp);
+      }
+    }
+    syncNameInputs();
+  }
+
+  function renderPassDevice(app){
+    var p = alivePlayers()[state.turnIndex % alivePlayers().length];
+    var panel = el('div','pixel-panel center');
+    panel.appendChild(el('div','big-emoji','📱'));
+    panel.appendChild(el('h2','','ส่งเครื่องให้'));
+    panel.appendChild(el('h1','',esc(p.name)));
+    panel.appendChild(el('p','dim','คืนที่ '+state.day+' / '+TARGET_DAY));
+    var btn = el('button','btn','▶ ถึงตาฉันแล้ว');
+    btn.onclick=function(){ state.phase='event'; state.lastEvent=EVENTS[pickEvent()]; state.prankMode=false; render(); };
+    panel.appendChild(btn);
+    app.appendChild(panel);
+    app.appendChild(renderRoster());
+  }
+
+  function renderRoster(){
+    var wrap = el('div','roster');
+    var living = alivePlayers();
+    var activeP = living[state.turnIndex % living.length];
+    state.players.forEach(function(p){
+      var row = el('div','roster-item'+(!p.alive?' dead':(p===activeP?' active':'')));
+      row.innerHTML = '<span>'+(p.alive?'':'🧟 ')+esc(p.name)+'</span><span class="hearts">'+heartsFor(p.hp)+'</span>';
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  function renderEvent(app){
+    var living = alivePlayers();
+    var p = living[state.turnIndex % living.length];
+    if(!p._starvedThisTurn){
+      p._starvedThisTurn = true;
+      if(p.food<=0){
+        var msg = doDamage(p,1,'ไม่มีเสบียงเหลือ ร่างกายอ่อนล้าจากความหิว');
+        state.lastOutcome = msg; state.lastType='bad'; state.phase='result'; return render();
+      }
+    }
+    var daybar = el('div','daybar');
+    daybar.innerHTML='<span>คืนที่ <b>'+state.day+'</b> / '+TARGET_DAY+'</span><span>'+esc(p.name)+'</span>';
+    app.appendChild(daybar);
+
+    var others = living.filter(function(o){ return o!==p; });
+
+    if(state.prankMode){
+      var ppanel = el('div','pixel-panel');
+      ppanel.appendChild(el('h2','','🎭 เลือกเป้าหมาย'));
+      ppanel.appendChild(el('p','dim','แอบไปปล้น/แกล้งใครดี? มีโอกาสโดนจับได้เหมือนกันนะ'));
+      others.forEach(function(target){
+        var tbtn = el('button','btn alt','▶ '+esc(target.name));
+        tbtn.onclick=function(){
+          var before = {hp:p.hp, food:p.food, ammo:p.ammo};
+          state.lastOutcome = doPrank(p,target);
+          state.lastType = deltaType(before,p);
+          state.prankMode=false; state.phase='result'; render();
+        };
+        ppanel.appendChild(tbtn);
+      });
+      var cancel = el('button','btn ghost','◀ กลับไปเหตุการณ์เดิม');
+      cancel.onclick=function(){ state.prankMode=false; render(); };
+      ppanel.appendChild(cancel);
+      app.appendChild(ppanel);
+      return;
+    }
+
+    var panel = el('div','pixel-panel');
+    var statrow = el('div','statrow');
+    statrow.appendChild(statBox('hp','HP',p.hp));
+    statrow.appendChild(statBox('food','เสบียง',p.food));
+    statrow.appendChild(statBox('ammo','กระสุน',p.ammo));
+    panel.appendChild(statrow);
+
+    panel.appendChild(el('h2','','เหตุการณ์'));
+    panel.appendChild(el('p','',esc(state.lastEvent.text)));
+
+    var choiceWrap = el('div','choices');
+    state.lastEvent.choices.forEach(function(choice,idx){
+      var btn = el('button','btn'+(idx===state.lastEvent.choices.length-1?' alt':''),choice.label);
+      btn.onclick=function(){
+        var before = {hp:p.hp, food:p.food, ammo:p.ammo};
+        state.lastOutcome=choice.run(p);
+        state.lastType = deltaType(before,p);
+        state.phase='result'; render();
+      };
+      choiceWrap.appendChild(btn);
+    });
+    panel.appendChild(choiceWrap);
+    app.appendChild(panel);
+
+    if(others.length>0){
+      var prankBtn = el('button','btn ghost','🎭 แกล้ง/ปล้นเพื่อนแทน');
+      prankBtn.onclick=function(){ state.prankMode=true; render(); };
+      app.appendChild(prankBtn);
+    }
+  }
+
+  function renderResult(app){
+    var living = alivePlayers();
+    var p = living[state.turnIndex % living.length];
+    var justDied = p.hp<=0 && p.alive;
+    if(justDied) p.alive=false;
+
+    var type = justDied ? 'bad' : (state.lastType||'neutral');
+    var panelCls = 'pixel-panel center result-anim' + (type==='bad'?' result-bad':(type==='good'?' result-good':''));
+    var emoji = justDied ? '🧟' : (type==='good' ? '✨' : (type==='bad' ? '💥' : '☑'));
+
+    var panel = el('div',panelCls);
+    panel.appendChild(el('div','big-emoji', emoji));
+    panel.appendChild(el('h2','', justDied?'กลายเป็นซอมบี้แล้ว':'ผลลัพธ์'));
+    panel.appendChild(el('p','',esc(state.lastOutcome)));
+
+    if(!justDied){
+      var statrow = el('div','statrow');
+      statrow.appendChild(statBox('hp','HP',p.hp));
+      statrow.appendChild(statBox('food','เสบียง',p.food));
+      statrow.appendChild(statBox('ammo','กระสุน',p.ammo));
+      panel.appendChild(statrow);
+    }
+
+    var btn = el('button','btn','▶ ต่อไป');
+    btn.onclick=function(){ advanceLocalTurn(); };
+    panel.appendChild(btn);
+    app.appendChild(panel);
+    app.appendChild(renderRoster());
+  }
+
+  function advanceLocalTurn(){
+    state.players.forEach(function(p){ p._starvedThisTurn=false; });
+    var living = alivePlayers();
+    if(living.length===0){ state.phase='end'; state.result='allDead'; return render(); }
+    state.turnIndex++;
+    var stillLiving = alivePlayers();
+    if(state.turnIndex >= stillLiving.length){
+      state.turnIndex=0; state.day++;
+      if(state.day > TARGET_DAY){ state.phase='end'; state.result='win'; return render(); }
+      state.phase='night'; return render();
+    }
+    state.phase='passDevice'; render();
+  }
+
+  function renderNight(app){
+    var panel = el('div','pixel-panel center');
+    panel.appendChild(el('div','big-emoji','🌙'));
+    panel.appendChild(el('h2','','คืนที่ '+state.day+' ผ่านไปแล้ว'));
+    panel.appendChild(el('p','dim','ฝูงซอมบี้ดูจะแข็งแกร่งขึ้นทุกคืน... เหลืออีก '+Math.max(0,TARGET_DAY-state.day+1)+' คืนถึงรุ่งอรุณ'));
+    var btn = el('button','btn','▶ เริ่มคืนถัดไป');
+    btn.onclick=function(){ state.phase='passDevice'; render(); };
+    panel.appendChild(btn);
+    app.appendChild(panel);
+    app.appendChild(renderRoster());
+  }
+
+  function renderEnd(app){
+    var panel = el('div','pixel-panel center');
+    if(state.result==='win'){
+      panel.appendChild(el('div','big-emoji','🏆'));
+      panel.appendChild(el('h1','','รอดจนถึง<br>รุ่งอรุณ!'));
+      panel.appendChild(el('p','','ผู้รอดชีวิต:'));
+      alivePlayers().forEach(function(p){ panel.appendChild(el('p','',' • '+esc(p.name))); });
+    } else {
+      panel.appendChild(el('div','big-emoji','🧟‍♂️🧟‍♀️'));
+      panel.appendChild(el('h1','','ซอมบี้<br>ครองเมือง'));
+      panel.appendChild(el('p','dim','ไม่มีใครรอดถึงคืนที่ '+TARGET_DAY));
+    }
+    var btn = el('button','btn blood','↺ เล่นใหม่');
+    btn.onclick=function(){ state.phase='home'; state.players=[]; render(); };
+    panel.appendChild(btn);
+    app.appendChild(panel);
+  }
+
+  function genCode(){ var chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; var s=''; for(var i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)]; return s; }
+  function genId(){ return 'p'+Math.random().toString(36).slice(2,10); }
+
+  function getDb(){
+    return Promise.resolve(firestoreWrapped);
+  }
+
+  function renderOnlineCreateName(app){
+    var panel = el('div','pixel-panel');
+    panel.appendChild(el('h1','','สร้างห้อง<br>ออนไลน์'));
+    if(state.online.createError) panel.appendChild(el('p','err',esc(state.online.createError)));
+    var input = document.createElement('input'); input.type='text'; input.placeholder='ชื่อของคุณ'; input.maxLength=14;
+    panel.appendChild(input);
+    var btn = el('button','btn','▶ สร้างห้อง');
+    btn.onclick = function(){
+      var name = input.value.trim();
+      if(!name){ state.online.createError='ใส่ชื่อก่อนนะ'; render(); return; }
+      btn.textContent='กำลังสร้าง...'; btn.disabled=true;
+      createRoom(name);
+    };
+    panel.appendChild(btn);
+    var back = el('button','btn ghost','◀ กลับ');
+    back.onclick=function(){ state.phase='home'; render(); };
+    panel.appendChild(back);
+    app.appendChild(panel);
+  }
+
+  function createRoom(name){
+    getDb().then(function(db){
+      if(!db){ state.online.createError='เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่'; state.phase='onlineCreateName'; return render(); }
+      var code = genCode();
+      var roomRef = db.doc('rooms/'+code);
+      roomRef.set({ status:'lobby', targetDay:TARGET_DAY, createdAt:Date.now() }).then(function(){
+        var myId = genId();
+        return roomRef.collection('players').doc(myId).set({ name:name, hp:5, food:3, ammo:2, alive:true, joinedAt:Date.now() }).then(function(){
+          state.online.code = code; state.online.myId = myId; state.online.myName = name; state.online.roomRef = roomRef;
+          enterOnlineRoom();
+        });
+      }).catch(function(){
+        state.online.createError='สร้างห้องไม่สำเร็จ ลองใหม่อีกครั้ง'; state.phase='onlineCreateName'; render();
+      });
+    });
+  }
+
+  function renderOnlineJoin(app){
+    var panel = el('div','pixel-panel');
+    panel.appendChild(el('h1','','เข้าร่วม<br>ห้องออนไลน์'));
+    if(state.online.joinError) panel.appendChild(el('p','err',esc(state.online.joinError)));
+    var codeInput = document.createElement('input'); codeInput.type='text'; codeInput.className='code-input';
+    codeInput.placeholder='รหัสห้อง'; codeInput.maxLength=4;
+    if(state.online.prefillCode) codeInput.value = state.online.prefillCode;
+    panel.appendChild(codeInput);
+    var nameInput = document.createElement('input'); nameInput.type='text'; nameInput.placeholder='ชื่อของคุณ'; nameInput.maxLength=14;
+    panel.appendChild(nameInput);
+    var btn = el('button','btn','▶ เข้าร่วม');
+    btn.onclick = function(){
+      var code = codeInput.value.trim().toUpperCase();
+      var name = nameInput.value.trim();
+      if(!code || !name){ state.online.joinError='ใส่ทั้งรหัสห้องและชื่อ'; render(); return; }
+      btn.textContent='กำลังเข้าร่วม...'; btn.disabled=true;
+      joinRoom(code,name);
+    };
+    panel.appendChild(btn);
+    var back = el('button','btn ghost','◀ กลับ');
+    back.onclick=function(){ state.phase='home'; render(); };
+    panel.appendChild(back);
+    app.appendChild(panel);
+  }
+
+  function joinRoom(code,name){
+    getDb().then(function(db){
+      if(!db){ state.online.joinError='เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่'; state.phase='onlineJoin'; return render(); }
+      var roomRef = db.doc('rooms/'+code);
+      roomRef.get().then(function(snap){
+        if(!snap.exists){ state.online.joinError='ไม่พบห้องนี้ ตรวจรหัสอีกครั้ง'; state.phase='onlineJoin'; return render(); }
+        var data = snap.data();
+        if(data.status !== 'lobby'){ state.online.joinError='ห้องนี้เริ่มเกมไปแล้ว'; state.phase='onlineJoin'; return render(); }
+        var myId = genId();
+        return roomRef.collection('players').doc(myId).set({ name:name, hp:5, food:3, ammo:2, alive:true, joinedAt:Date.now() }).then(function(){
+          state.online.code = code; state.online.myId = myId; state.online.myName = name; state.online.roomRef = roomRef;
+          enterOnlineRoom();
+        });
+      }).catch(function(){
+        state.online.joinError='เข้าร่วมไม่สำเร็จ ลองใหม่อีกครั้ง'; state.phase='onlineJoin'; render();
+      });
+    });
+  }
+
+  function enterOnlineRoom(){
+    var roomRef = state.online.roomRef;
+    state.online.playersUnsub = roomRef.collection('players').onSnapshot(function(qs){
+      var list = [];
+      qs.docs.forEach(function(d){ var v=d.data(); v.id=d.id; list.push(v); });
+      list.sort(function(a,b){ return (a.joinedAt||0)-(b.joinedAt||0); });
+      state.online.playersList = list;
+      if(state.phase==='onlineLobby' || state.phase==='onlineGame') render();
+    }, function(err){ /* connection issue - degrade quietly */ });
+
+    state.online.metaUnsub = roomRef.onSnapshot(function(snap){
+      if(!snap.exists) return;
+      var data = snap.data();
+      var key = data.activePlayerId+'|'+data.day;
+      if(key !== state.online._turnKey){ state.online._turnKey=key; state.online._starveChecked=false; state.online.prankMode=false; }
+      state.online.meta = data;
+      if(state.phase==='onlineLobby' && data.status==='playing'){ state.phase='onlineGame'; }
+      if(state.phase==='onlineLobby' || state.phase==='onlineGame') render();
+    }, function(err){ /* connection issue - degrade quietly */ });
+
+    state.phase='onlineLobby'; render();
+  }
+
+  function leaveOnline(){
+    if(state.online.playersUnsub) state.online.playersUnsub();
+    if(state.online.metaUnsub) state.online.metaUnsub();
+    state.online = freshOnline();
+    state.phase='home'; render();
+  }
+
+  function buildJoinLink(code){
+    return window.location.origin + window.location.pathname + '?code=' + code;
+  }
+
+  function copyJoinLink(inputEl, btn){
+    inputEl.focus(); inputEl.select();
+    try{ inputEl.setSelectionRange(0,999); }catch(e){}
+    var reset = function(){ setTimeout(function(){ btn.textContent='📋 คัดลอกลิงก์เชิญเพื่อน'; },1500); };
+    var fallback = function(){
+      try{ document.execCommand('copy'); btn.textContent='✅ คัดลอกแล้ว'; reset(); }
+      catch(e2){ btn.textContent='แตะช่องด้านบนแล้วคัดลอกเอง'; reset(); }
+    };
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(inputEl.value)
+          .then(function(){ btn.textContent='✅ คัดลอกแล้ว'; reset(); })
+          .catch(fallback);
+      } else { fallback(); }
+    }catch(e){ fallback(); }
+  }
+
+  function renderOnlineLobby(app){
+    var panel = el('div','pixel-panel center');
+    panel.appendChild(el('h2','','รหัสห้อง — บอกให้เพื่อน'));
+    panel.appendChild(el('div','code-display',esc(state.online.code)));
+
+    var linkInput = document.createElement('input');
+    linkInput.type='text'; linkInput.readOnly=true; linkInput.value=buildJoinLink(state.online.code);
+    linkInput.style.fontSize='14px'; linkInput.style.marginTop='4px';
+    linkInput.onclick=function(){ this.select(); };
+    panel.appendChild(linkInput);
+    var copyBtn = el('button','btn alt','📋 คัดลอกลิงก์เชิญเพื่อน');
+    copyBtn.onclick=function(){ copyJoinLink(linkInput, copyBtn); };
+    panel.appendChild(copyBtn);
+    panel.appendChild(el('p','dim','เพื่อนกดลิงก์นี้แล้วจะข้ามไปหน้าใส่ชื่อพร้อมรหัสห้องให้เลย (ต้องแชร์อาร์ติแฟกต์นี้ให้เขาเปิดได้ก่อนด้วยปุ่ม Share)'));
+
+    panel.appendChild(el('p','dim','ผู้เล่นในห้อง ('+state.online.playersList.length+')'));
+
+    var wrap = el('div','roster');
+    state.online.playersList.forEach(function(p){
+      var row = el('div','roster-item'+(p.id===state.online.myId?' active':''));
+      row.innerHTML = '<span>'+esc(p.name)+(p.id===state.online.myId?' (คุณ)':'')+'</span><span></span>';
+      wrap.appendChild(row);
+    });
+    panel.appendChild(wrap);
+
+    var canStart = state.online.playersList.length >= 2;
+    var startBtn = el('button','btn', canStart ? '▶ เริ่มเกม' : 'รอผู้เล่นอีกอย่างน้อย 1 คน');
+    startBtn.disabled = !canStart;
+    startBtn.onclick = function(){ startOnlineGame(); };
+    panel.appendChild(startBtn);
+
+    var leave = el('button','btn ghost','◀ ออกจากห้อง');
+    leave.onclick = leaveOnline;
+    panel.appendChild(leave);
+
+    app.appendChild(panel);
+  }
+
+  function startOnlineGame(){
+    var alive = state.online.playersList.filter(function(p){ return p.alive; });
+    if(alive.length < 2) return;
+    state.online.roomRef.update({
+      status:'playing', day:1, turnPhase:'awaitingChoice',
+      activePlayerId: alive[0].id, eventIdx: pickEvent(),
+      lastOutcome:'', lastChoiceLabel:''
+    }).catch(function(){});
+  }
+
+  function playerRef(id){ return state.online.roomRef.collection('players').doc(id); }
+
+  function renderOnlineRoster(activeId){
+    var wrap = el('div','roster');
+    state.online.playersList.forEach(function(p){
+      var row = el('div','roster-item'+(!p.alive?' dead':(p.id===activeId?' active':'')));
+      row.innerHTML = '<span>'+(p.alive?'':'🧟 ')+esc(p.name)+(p.id===state.online.myId?' (คุณ)':'')+'</span><span class="hearts">'+heartsFor(p.hp)+'</span>';
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  function renderOnlineGame(app){
+    var meta = state.online.meta;
+    var players = state.online.playersList;
+    if(!meta || !players.length){
+      var loading = el('div','pixel-panel center');
+      loading.appendChild(el('p','dim','กำลังเชื่อมต่อห้อง...'));
+      app.appendChild(loading);
+      return;
+    }
+
+    if(meta.status==='ended'){
+      var panel = el('div','pixel-panel center');
+      if(meta.result==='win'){
+        panel.appendChild(el('div','big-emoji','🏆'));
+        panel.appendChild(el('h1','','รอดจนถึง<br>รุ่งอรุณ!'));
+        panel.appendChild(el('p','','ผู้รอดชีวิต:'));
+        players.filter(function(p){return p.alive;}).forEach(function(p){ panel.appendChild(el('p','',' • '+esc(p.name))); });
+      } else {
+        panel.appendChild(el('div','big-emoji','🧟‍♂️🧟‍♀️'));
+        panel.appendChild(el('h1','','ซอมบี้<br>ครองเมือง'));
+        panel.appendChild(el('p','dim','ไม่มีใครรอดถึงคืนที่ '+TARGET_DAY));
+      }
+      var leave = el('button','btn ghost','◀ ออกจากห้อง');
+      leave.onclick = leaveOnline;
+      panel.appendChild(leave);
+      app.appendChild(panel);
+      return;
+    }
+
+    var me = players.filter(function(p){ return p.id===state.online.myId; })[0];
+    var isMyTurn = meta.activePlayerId === state.online.myId;
+    var activeName = (players.filter(function(p){return p.id===meta.activePlayerId;})[0] || {}).name || '...';
+
+    var daybar = el('div','daybar');
+    daybar.innerHTML = '<span>คืนที่ <b>'+meta.day+'</b> / '+TARGET_DAY+'</span><span>รหัส '+esc(state.online.code)+'</span>';
+    app.appendChild(daybar);
+
+    if(meta.turnPhase==='awaitingChoice'){
+      if(isMyTurn && me){
+        if(!state.online._starveChecked && me.food<=0){
+          state.online._starveChecked = true;
+          var newHp = Math.max(0, me.hp-1);
+          playerRef(me.id).update({ hp:newHp, alive: newHp>0 }).then(function(){
+            return state.online.roomRef.update({ turnPhase:'result', lastOutcome:'ไม่มีเสบียงเหลือ ร่างกายอ่อนล้าจากความหิว -1 HP', lastChoiceLabel:'อดอยาก', lastType:'bad' });
+          }).catch(function(){});
+          var wait = el('div','pixel-panel center');
+          wait.appendChild(el('p','dim','กำลังประมวลผล...'));
+          app.appendChild(wait);
+          return;
+        }
+        state.online._starveChecked = true;
+
+        var otherAlive = players.filter(function(o){ return o.alive && o.id!==me.id; });
+
+        if(state.online.prankMode){
+          var ppanel = el('div','pixel-panel');
+          ppanel.appendChild(el('h2','','🎭 เลือกเป้าหมาย'));
+          ppanel.appendChild(el('p','dim','แอบไปปล้น/แกล้งใครดี? มีโอกาสโดนจับได้เหมือนกันนะ'));
+          otherAlive.forEach(function(target){
+            var tbtn = el('button','btn alt','▶ '+esc(target.name));
+            tbtn.onclick = function(){
+              tbtn.disabled = true;
+              var before = { hp:me.hp, food:me.food, ammo:me.ammo };
+              var actorCopy = { name:me.name, hp:me.hp, food:me.food, ammo:me.ammo };
+              var targetCopy = { name:target.name, food:target.food, ammo:target.ammo };
+              var outcome = doPrank(actorCopy, targetCopy);
+              var type = deltaType(before, actorCopy);
+              state.online.prankMode = false;
+              playerRef(me.id).update({ hp:actorCopy.hp, food:actorCopy.food, ammo:actorCopy.ammo, alive:actorCopy.hp>0 })
+                .then(function(){ return playerRef(target.id).update({ food:targetCopy.food, ammo:targetCopy.ammo }); })
+                .then(function(){ return state.online.roomRef.update({ turnPhase:'result', lastOutcome:outcome, lastChoiceLabel:'🎭 แกล้งเพื่อน', lastType:type }); })
+                .catch(function(){});
+            };
+            ppanel.appendChild(tbtn);
+          });
+          var cancel = el('button','btn ghost','◀ กลับไปเหตุการณ์เดิม');
+          cancel.onclick = function(){ state.online.prankMode=false; render(); };
+          ppanel.appendChild(cancel);
+          app.appendChild(ppanel);
+          app.appendChild(renderOnlineRoster(meta.activePlayerId));
+          return;
+        }
+
+        var panel = el('div','pixel-panel');
+        var statrow = el('div','statrow');
+        statrow.appendChild(statBox('hp','HP',me.hp));
+        statrow.appendChild(statBox('food','เสบียง',me.food));
+        statrow.appendChild(statBox('ammo','กระสุน',me.ammo));
+        panel.appendChild(statrow);
+        panel.appendChild(el('h2','','ตาของคุณ'));
+        panel.appendChild(el('p','',esc(EVENTS[meta.eventIdx].text)));
+
+        EVENTS[meta.eventIdx].choices.forEach(function(choice,idx){
+          var btn = el('button','btn'+(idx===EVENTS[meta.eventIdx].choices.length-1?' alt':''),choice.label);
+          btn.onclick = function(){
+            btn.disabled = true;
+            var before = { hp:me.hp, food:me.food, ammo:me.ammo };
+            var p = { hp:me.hp, food:me.food, ammo:me.ammo };
+            var outcome = choice.run(p);
+            var type = deltaType(before, p);
+            playerRef(me.id).update({ hp:p.hp, food:p.food, ammo:p.ammo, alive: p.hp>0 }).then(function(){
+              return state.online.roomRef.update({ turnPhase:'result', lastOutcome:outcome, lastChoiceLabel:choice.label, lastType:type });
+            }).catch(function(){});
+          };
+          panel.appendChild(btn);
+        });
+        app.appendChild(panel);
+
+        if(otherAlive.length>0){
+          var prankBtn = el('button','btn ghost','🎭 แกล้ง/ปล้นเพื่อนแทน');
+          prankBtn.onclick = function(){ state.online.prankMode=true; render(); };
+          app.appendChild(prankBtn);
+        }
+      } else {
+        var wait2 = el('div','pixel-panel center');
+        wait2.appendChild(el('div','big-emoji','⏳'));
+        wait2.appendChild(el('p','waitline','รอ '+esc(activeName)+' ตัดสินใจ...'));
+        app.appendChild(wait2);
+      }
+      app.appendChild(renderOnlineRoster(meta.activePlayerId));
+      return;
+    }
+
+    if(meta.turnPhase==='result'){
+      var activeObj = players.filter(function(pl){ return pl.id===meta.activePlayerId; })[0];
+      var justDied = activeObj && activeObj.hp<=0;
+      var rtype = justDied ? 'bad' : (meta.lastType||'neutral');
+      var rpanelCls = 'pixel-panel center result-anim' + (rtype==='bad'?' result-bad':(rtype==='good'?' result-good':''));
+      var remoji = justDied ? '🧟' : (rtype==='good' ? '✨' : (rtype==='bad' ? '💥' : '☑'));
+
+      var rpanel = el('div',rpanelCls);
+      rpanel.appendChild(el('div','big-emoji', remoji));
+      rpanel.appendChild(el('h2','', esc(activeName)+' — '+esc(meta.lastChoiceLabel||'')));
+      rpanel.appendChild(el('p','',esc(meta.lastOutcome)));
+      if(isMyTurn){
+        var nextBtn = el('button','btn','▶ ต่อไป');
+        nextBtn.onclick = function(){ nextBtn.disabled=true; advanceOnlineTurn(); };
+        rpanel.appendChild(nextBtn);
+      } else {
+        rpanel.appendChild(el('p','waitline','รอ '+esc(activeName)+' กดต่อไป...'));
+      }
+      app.appendChild(rpanel);
+      app.appendChild(renderOnlineRoster(meta.activePlayerId));
+      return;
+    }
+  }
+
+  function advanceOnlineTurn(){
+    var meta = state.online.meta;
+    var alive = state.online.playersList.filter(function(p){ return p.alive; })
+      .sort(function(a,b){ return (a.joinedAt||0)-(b.joinedAt||0); });
+
+    if(alive.length===0){
+      state.online.roomRef.update({ status:'ended', result:'allDead' }).catch(function(){});
+      return;
+    }
+    var idx = -1;
+    for(var i=0;i<alive.length;i++){ if(alive[i].id===meta.activePlayerId) idx=i; }
+    var nextIdx = idx+1;
+    var day = meta.day;
+    if(nextIdx >= alive.length){ nextIdx=0; day+=1; }
+
+    if(day > TARGET_DAY){
+      state.online.roomRef.update({ status:'ended', result:'win', day:day }).catch(function(){});
+      return;
+    }
+    var nextPlayer = alive[nextIdx];
+    state.online.roomRef.update({
+      turnPhase:'awaitingChoice', activePlayerId: nextPlayer.id, day: day,
+      eventIdx: pickEvent(), lastOutcome:'', lastChoiceLabel:''
+    }).catch(function(){});
+  }
+
+  (function checkJoinLink(){
+    try{
+      var params = new URLSearchParams(window.location.search);
+      var urlCode = (params.get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+      if(urlCode.length===4){
+        state.online.prefillCode = urlCode;
+        state.phase = 'onlineJoin';
+      }
+    }catch(e){}
+  })();
+
+  render();
+})();
+</script>
+</body>
+</html>
